@@ -1,0 +1,49 @@
+.PHONY: default clean all depend
+
+JUNK =  *.o *.core core.*
+PRODUCTS = kvs_server kvs_client gen_log
+LIBS = -lpthread
+CC = g++
+LD = g++
+CFLAGS = -Wall -g
+
+SRCS_SERVER = kvs_server.cc connection_manager.cc tiny_table.cc\
+              replicated_log.cc log_file.cc paxos.cc paxos_log.cc results_buffer.cc\
+              asynchronous_network.cc s_main.cc
+#gen_log.cc
+SRCS_UTILS = utils.cc
+
+SRCS_CLIENT = kvs_client.cc c_main.cc
+
+SRCS = $(SRCS_SERVER) $(SRCS_CLIENT) $(SRCS_UTILS)
+
+OBJS_SERVER = $(SRCS_SERVER:.cc=.o)
+
+OBJS_CLIENT = $(SRCS_CLIENT:.cc=.o)
+
+OBJS_UTILS = $(SRCS_UTILS:.cc=.o)
+
+default:
+	@echo PLZ check README for usage
+
+clean:
+	rm -f $(JUNK) $(PRODUCTS)
+
+all: $(PRODUCTS)
+
+depend:
+	makedepend -Y. $(SRCS)
+
+%.o: %.cc
+	$(CC) $(CFLAGS) -o $@ -c $<
+
+kvs_client: $(OBJS_CLIENT) $(OBJS_UTILS)
+	$(LD) -o $@ $^ $(LIBS)
+
+kvs_server: $(OBJS_SERVER) $(OBJS_UTILS)
+	$(LD) -o $@ $^ $(LIBS)
+
+gen_log: gen_log.o
+	$(LD) -o $@ $<
+
+

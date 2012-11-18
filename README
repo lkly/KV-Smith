@@ -1,0 +1,11 @@
+KVS_CLIENT:
+new kvs_client(parameters);
+using as normal object.
+see samples in test/KVS_CLIENT
+
+
+KVS_SERVER:
+using gen_log generate paxos_log.
+new kvs_server(parameters);
+call kvs_server::start;
+see samples in test/KVS_SERVER
