@@ -18,6 +18,7 @@ kvs_server::kvs_server(server_name &name, server_address &address, map<server_na
 	logging_number = 0;
 	pthread_mutex_init(&ln_mutex, NULL);
 	pthread_cond_init(&ln_cv, NULL);
+	pthread_cond_init(&ln_cv2, NULL);
 }
 
 kvs_server::~kvs_server() {
@@ -137,15 +138,18 @@ kvs_server::log(string record, bool stable) {
 	//here is where parallelism in.
 	//and now just a plain parallelism-free scheme.
 	replicated_log::status r;
-	pthread_mutex_lock(&log_mutex);
+	//pthread_mutex_lock(&log_mutex);
 	r = mylog->log(record, stable, log_protocol::DOLOGTO);
-	pthread_mutex_unlock(&log_mutex);
+	//pthread_mutex_unlock(&log_mutex);
 	return r;
 }
 
 void
 kvs_server::log_prologue() {
 	pthread_mutex_lock(&ln_mutex);
+	while (logging_number == window_size) {
+		pthread_cond_wait(&ln_cv2, &ln_mutex);
+	}
 	logging_number++;
 	pthread_mutex_unlock(&ln_mutex);
 }
@@ -154,6 +158,9 @@ void
 kvs_server::log_epilogue() {
 	pthread_mutex_lock(&ln_mutex);
 	logging_number--;
+	if (logging_number < window_size) {
+		pthread_cond_signal(&ln_cv2);
+	}
 	if (logging_number == 0) {
 		pthread_cond_signal(&ln_cv);
 	}
@@ -180,6 +187,7 @@ kvs_server::recover() {
 				assert(client_number == 0);
 				am_i_primary = true;
 				pthread_mutex_unlock(&cn_mutex);
+				mylog->skip(window_size);
 				return;
 			} else {
 				continue;
@@ -244,6 +252,7 @@ kvs_server::redo(string &record, int &deltato) {
 		case log_protocol::BEMASTER:
 			//try to eliminate interference to the new master.
 			deltato = 3;
+			mylog->skip(window_size);
 			break;
 		default:
 			kvs_error("@redo: kvs_server reads an unknown record type %d from log!\n", rt);
@@ -297,6 +306,7 @@ kvs_server::restart() {
 	pthread_mutex_unlock(&cn_mutex);
 	mylog->reset();
 }
+
 
 
 

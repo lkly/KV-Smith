@@ -24,6 +24,7 @@ class kvs_server {
 		void start();
 
 	private:
+		static int window_size = 1000;
 		server_name myname;
 		server_address myaddress;
 		map<server_name, server_address> mymembers;
@@ -36,6 +37,7 @@ class kvs_server {
 		int logging_number;
 		pthread_mutex_t ln_mutex;
 		pthread_cond_t ln_cv;
+		pthread_cond_t ln_cv2;
 		pthread_mutex_t log_mutex;
 		replicated_log *mylog;
 
@@ -55,5 +57,6 @@ class kvs_server {
 		bool doheartbeat();
 		void restart();
 };
+
 
 

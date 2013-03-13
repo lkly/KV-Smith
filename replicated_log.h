@@ -26,6 +26,7 @@ class replicated_log {
 		replicated_log::status log(string &, bool, int);
 		bool next_record(string &, int);
 		void reset();
+		void skip(int);
 
 	private:
 
@@ -40,6 +41,7 @@ class replicated_log {
 		paxos *mypaxos;
 		log_file *myfile;
 		server_name myname;
+		map<int, int> mv_window;
 
 		bool failed();
 		void prologue(int &, string &);
@@ -47,6 +49,7 @@ class replicated_log {
 		void movehead(int &);
 		void set_failure();
 };
+
 
 
 

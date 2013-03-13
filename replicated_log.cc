@@ -147,8 +147,15 @@ replicated_log::epilogue(bool failed, int &slot_num) {
 void
 replicated_log::movehead(int &slot_num) {
 	//hold rwhead lock.
-	//and just now.
-	rwhead = slot_num + 1;
+	//and just now.+++
+	mv_window[slot_num] = 1;
+	while (1) {
+		if (mv_window[rwhead+1] != 0) {
+			rwhead++;
+		} else {
+			break;
+		}
+	}
 }
 
 void
@@ -164,5 +171,14 @@ replicated_log::reset() {
 	assert(failure == true);
 	failure = false;
 	movedhead = rwhead;
+	mv_window.clear();
 }
+
+void
+replicated_log::skip(int window_size) {
+	//safe: same as reset.
+	rwhead = rwhead + window_size;
+	movehead = rwhead;
+}
+
 
