@@ -56,17 +56,16 @@ log_file::read(int number, string &record, struct timespec &timeout) {
 	}
 	pthread_mutex_unlock(&reader_mutex);
 	pthread_mutex_lock(&cache_mutex);
-	//why this?
-	//if (timeout == 0) {
-	//	if (cache.find(number) == cache.end()) {
-	//		pthread_mutex_unlock(&cache_mutex);
-	//		return false;
-	//	} else {
-	//		record = cache[number];
-	//		pthread_mutex_unlock(&cache_mutex);
-	//		return true;
-	//	}
-	//}
+	if (timeout.tv_sec == 0) {
+		if (cache.find(number) == cache.end()) {
+			pthread_mutex_unlock(&cache_mutex);
+			return false;
+		} else {
+			record = cache[number];
+			pthread_mutex_unlock(&cache_mutex);
+			return true;
+		}
+	}
 	while (cache.find(number) == cache.end()) {
 		if (pthread_cond_timedwait(&cache_cv, &cache_mutex, &timeout) == ETIMEDOUT) {
 			pthread_mutex_unlock(&cache_mutex);
@@ -95,12 +94,14 @@ log_file::write(int number, string &record) {
 	pthread_mutex_lock(&writer_mutex);
 	//let data expose to reader ASAP.
 	pthread_mutex_unlock(&cache_mutex);
-	writer << number;
-	writer << ' ';
-	writer << record;
-	writer << '\n';
-	writer.flush();
-	assert(writer.good());
+	//all the data in paxos log now
+	//don't need this.
+	//writer << number;
+	//writer << ' ';
+	//writer << record;
+	//writer << '\n';
+	//writer.flush();
+	//assert(writer.good());
 	pthread_mutex_unlock(&writer_mutex);
 }
 

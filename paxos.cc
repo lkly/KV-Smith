@@ -12,7 +12,8 @@ paxos::paxos(server_name &name, map<server_name, server_address> &members, log_f
 	first_to_decide = wfile->size();
 	mylog = new paxos_log(name);
 	window = mylog->size();
-	init_acceptor_buffer();
+	//neglect this for no effects.
+	//init_acceptor_buffer();
 	pthread_mutex_init(&buffer_mutex, NULL);
 	network = new asynchronous_network(members, this);
 	//initialization should in this order.
@@ -379,10 +380,13 @@ void
 paxos::passive_catchup(string &dest, int slot_num) {
 	int catchup_num = min(catchup_window, first_to_decide-slot_num);
 	pthread_mutex_unlock(&buffer_mutex);
+	struct timespec ts;
+	ts.tv_sec = 0;
+	ts.tv_nsec = 0;
 	int i = 0;
 	for (; i < catchup_num; i++) {
 		string record;
-		bool r = wfile->read(slot_num+i, record, 0);
+		bool r = wfile->read(slot_num+i, record, ts);
 		if (r) {
 			stringstream message;
 			message << paxos_protocol::LEARN;
@@ -479,6 +483,10 @@ paxos::check_buffer() {
 		}
 		if (acceptor_buffer[first_to_decide][0] == "L") {
 			wfile->write(first_to_decide, acceptor_buffer[first_to_decide][3]);
+			//writing to paxos log
+			string proposal;
+			logged_proposal(first_to_decide, "D", "", acceptor_buffer[first_to_decide][3], proposal);
+			mylog->write(first_to_decide, proposal);
 			acceptor_buffer.erase(first_to_decide);
 		} else {
 			return;

@@ -24,17 +24,17 @@ class paxos_log {
 		static unsigned max_size;
 		static int length;
 		fstream writer;
-		int mytimestamp;
+		//int mytimestamp;
 		//reading once.
-		vector<string> records;
+		//vector<string> records;
 		pthread_mutex_t records_mutex;
-		map<int, int> locations;
-		pthread_mutex_t locations_mutex;
+		//map<int, int> locations;
+		//pthread_mutex_t locations_mutex;
 
 		void check_file(string &);
 		bool check_copy(fstream &, int &, string &);
 		void update_ts(int);
 };
 
-
-
+//we don't want to change header files.
+//so have some unused things here.
