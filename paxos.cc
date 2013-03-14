@@ -63,7 +63,7 @@ paxos::init_acceptor_buffer() {
 }
 
 paxos::status
-paxos::prepare(int slot_num, string &seq_num, string &proposed, int timeout) {
+paxos::prepare(int slot_num, string &seq_num, string &proposed, struct timespec &timeout) {
 	vector<string> results;
 	prepare_result.register_(slot_num, seq_num, &results);
 	stringstream message;
@@ -82,7 +82,7 @@ paxos::prepare(int slot_num, string &seq_num, string &proposed, int timeout) {
 }
 
 paxos::status
-paxos::accept(int slot_num, string &seq_num, string &proposal, int timeout) {
+paxos::accept(int slot_num, string &seq_num, string &proposal, struct timespec &timeout) {
 	vector<string> results;
 	accept_result.register_(slot_num, seq_num, &results);
 	stringstream message;

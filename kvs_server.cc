@@ -19,6 +19,24 @@ kvs_server::kvs_server(server_name &name, server_address &address, map<server_na
 	pthread_mutex_init(&ln_mutex, NULL);
 	pthread_cond_init(&ln_cv, NULL);
 	pthread_cond_init(&ln_cv2, NULL);
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	expire_time.tv_sec  = tv.tv_sec;//so when start up, it must be expired.
+	expire_time.tv_nsec = 0;//we don't use this field, so timing is much coarse-grained.
+	map<server_name, server_address>::iterator it;
+	int priority;
+	priority = 0;
+	bool found;
+	found = false;
+	for (it = mymembers.begin(); it != mymembers.end(); ++it) {
+		if (it->first == name) {
+			found = true;
+			break;
+		}
+		priority++;
+	}
+	assert(found);
+	delta = priority*2;
 }
 
 kvs_server::~kvs_server() {
@@ -79,7 +97,17 @@ kvs_server::put(int key, string &value) {
 	record << ' ';
 	record << value;
 	log_prologue();
-	replicated_log::status r = log(record.str(), true);
+	//should in log_prologue
+	struct timespec ts;
+	pthread_mutex_lock(&log_mutex);
+	ts = expire_time;
+	pthread_mutex_unlock(&log_mutex);
+	replicated_log::status r = log(record.str(), true, ts);
+	if (r == replicated_log::OK) {
+		pthread_mutex_lock(&log_mutex);
+		renew_lease(1);
+		pthread_mutex_unlock(&log_mutex);
+	}
 	log_epilogue();
 	if (r == replicated_log::FAIL) {
 		r_status = cs_protocol::RETRY;
@@ -134,14 +162,22 @@ kvs_server::marshal(string &r_message, cs_protocol::status status, string &r_val
 }
 
 replicated_log::status
-kvs_server::log(string record, bool stable) {
+kvs_server::log(string record, bool stable, struct timespec &to) {
 	//here is where parallelism in.
 	//and now just a plain parallelism-free scheme.
 	replicated_log::status r;
-	//pthread_mutex_lock(&log_mutex);
-	r = mylog->log(record, stable, log_protocol::DOLOGTO);
-	//pthread_mutex_unlock(&log_mutex);
+	r = mylog->log(record, stable, to);
 	return r;
+}
+
+void
+renew_lease(int c) {
+	//check am_i_primary?
+	//a simple scheme:
+	//renew lease every 5 successful requests, or a 200ms lease period.
+	lease_counter += c;
+	expire_time.tv_sec += lease_counter/5;
+	lease_counter = lease_counter % 5;
 }
 
 void
@@ -157,10 +193,10 @@ kvs_server::log_prologue() {
 void
 kvs_server::log_epilogue() {
 	pthread_mutex_lock(&ln_mutex);
-	logging_number--;
-	if (logging_number < window_size) {
+	if (logging_number == window_size) {
 		pthread_cond_signal(&ln_cv2);
 	}
+	logging_number--;
 	if (logging_number == 0) {
 		pthread_cond_signal(&ln_cv);
 	}
@@ -180,7 +216,11 @@ kvs_server::recover() {
 	int deltato = 0;
 	while (1) {
 		string record;
-		if (!mylog->next_record(record, log_protocol::DONEXTTO + deltato)) {
+		struct timespec ts;
+		//safe, since single-thread recovery.
+		ts = expire_time;
+		ts.tv_sec += delta;
+		if (!mylog->next_record(record, ts)) {
 			assert(record.length() == 0);
 			if (to_be_master()) {
 				pthread_mutex_lock(&cn_mutex);
@@ -215,10 +255,21 @@ kvs_server::to_be_master() {
 	bool success = false;
 	stringstream record;
 	record << log_protocol::BEMASTER;
-	replicated_log::status r = log(record.str(), false);
+	struct timespec ts;
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	//master has a 5s initial lease.
+	//but we don't want it used up.
+	unsigned int sec = tv.tv_sec + 5;
+	record << " ";
+	record << sec;
+	ts.tv_sec  = tv.tv_sec + 3;
+	ts.tv_nsec = 0;
+	replicated_log::status r = log(record.str(), false, ts);
 	switch (r) {
 		case replicated_log::OK:
 			success = true;
+			expire_time.tv_sec = sec;
 			break;
 		case replicated_log::TIMEOUT:
 		case replicated_log::FAIL:
@@ -238,19 +289,23 @@ kvs_server::redo(string &record, int &deltato) {
 	buffer << record;
 	buffer >> rt;
 	switch (rt) {
-		case log_protocol::UPDATE: {
+		case log_protocol::UPDATE:
 			//single-threaded recover.
-				int key;
-				buffer >> key;
-				string value;
-				buffer >> value;
-				local_db.update(key, value);
-			}
+			renew_lease(1);
+			int key;
+			buffer >> key;
+			string value;
+			buffer >> value;
+			local_db.update(key, value);
 			break;
 		case log_protocol::HEARTBEAT:
+			renew_lease(6);
 			break;
 		case log_protocol::BEMASTER:
 			//try to eliminate interference to the new master.
+			unsigned int sec;
+			buffer >> sec;
+			expire_time.tv_sec = sec;
 			deltato = 3;
 			mylog->skip(window_size);
 			break;
@@ -265,6 +320,7 @@ kvs_server::heartbeater() {
 		if (!doheartbeat()) {
 			return;
 		}
+		sleep(1);
 		//it may be beneficial to sleep a while here.
 		//or consider different timeout configurations.
 		//a safe scheme: NEXTTO == DOLOGTO + sleeptime
@@ -282,9 +338,16 @@ kvs_server::doheartbeat() {
 	bool success = false;
 	stringstream record;
 	record << log_protocol::HEARTBEAT;
+	struct timespec ts;
+	pthread_mutex_lock(&log_mutex);
+	ts = expire_time;
+	pthread_mutex_unlock(&log_mutex);
 	replicated_log::status r = log(record.str(), true);
 	switch (r) {
 		case replicated_log::OK:
+			pthread_mutex_lock(&log_mutex);
+			renew_lease(6);//account for scheduling's overhead.
+			pthread_mutex_unlock(&log_mutex);
 			success = true;
 			break;
 		case replicated_log::TIMEOUT:
@@ -304,6 +367,7 @@ kvs_server::restart() {
 		pthread_cond_wait(&cn_cv, &cn_mutex);
 	}
 	pthread_mutex_unlock(&cn_mutex);
+	lease_counter = 0;
 	mylog->reset();
 }
 

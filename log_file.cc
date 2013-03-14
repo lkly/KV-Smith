@@ -26,7 +26,7 @@ log_file::~log_file() {
 }
 
 bool
-log_file::read(int number, string &record, int timeout) {
+log_file::read(int number, string &record, struct timespec &timeout) {
 	//there may be a gap in cache.
 	pthread_mutex_lock(&reader_mutex);
 	if (first_cached > r_next) {
@@ -56,24 +56,19 @@ log_file::read(int number, string &record, int timeout) {
 	}
 	pthread_mutex_unlock(&reader_mutex);
 	pthread_mutex_lock(&cache_mutex);
-	if (timeout == 0) {
-		if (cache.find(number) == cache.end()) {
-			pthread_mutex_unlock(&cache_mutex);
-			return false;
-		} else {
-			record = cache[number];
-			pthread_mutex_unlock(&cache_mutex);
-			return true;
-		}
-	}
-	struct timespec ts;
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
-	ts.tv_sec  = tv.tv_sec;
-	ts.tv_nsec = tv.tv_usec * 1000;
-	ts.tv_sec += timeout;
+	//why this?
+	//if (timeout == 0) {
+	//	if (cache.find(number) == cache.end()) {
+	//		pthread_mutex_unlock(&cache_mutex);
+	//		return false;
+	//	} else {
+	//		record = cache[number];
+	//		pthread_mutex_unlock(&cache_mutex);
+	//		return true;
+	//	}
+	//}
 	while (cache.find(number) == cache.end()) {
-		if (pthread_cond_timedwait(&cache_cv, &cache_mutex, &ts) == ETIMEDOUT) {
+		if (pthread_cond_timedwait(&cache_cv, &cache_mutex, &timeout) == ETIMEDOUT) {
 			pthread_mutex_unlock(&cache_mutex);
 			return false;
 		}

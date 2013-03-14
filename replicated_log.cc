@@ -30,7 +30,7 @@ replicated_log::~replicated_log() {
 }
 
 replicated_log::status
-replicated_log::log(string &record, bool stable, int timeout) {
+replicated_log::log(string &record, bool stable, struct timespec &timeout) {
 	//timeout uses absolute time?
 	if (failed()) {
 		return FAIL;
@@ -86,7 +86,7 @@ replicated_log::log(string &record, bool stable, int timeout) {
 }
 
 bool
-replicated_log::next_record(string &record, int timeout) {
+replicated_log::next_record(string &record, struct timespec &timeout) {
 	//safe: no one is accessing the log except you.
 	assert(movedhead == rwhead);
 	bool r = myfile->read(rwhead, record, timeout);

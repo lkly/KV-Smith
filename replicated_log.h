@@ -8,6 +8,7 @@
 #include "common.h"
 #include "paxos.h"
 #include <map>
+#include <sys/time.h>
 
 using namespace std;
 
@@ -23,8 +24,8 @@ class replicated_log {
 
 		replicated_log(server_name &, map<server_name, server_address> &);
 		~replicated_log();
-		replicated_log::status log(string &, bool, int);
-		bool next_record(string &, int);
+		replicated_log::status log(string &, bool, struct timespec &);
+		bool next_record(string &, struct timespec &);
 		void reset();
 		void skip(int);
 

@@ -18,7 +18,7 @@ class results_buffer {
 		results_buffer();
 		~results_buffer();
 		void register_(int, string &, vector<string> *);
-		void unregister(int, string &, unsigned, int);
+		void unregister(int, string &, unsigned, struct timespec &);
 		void fill(int, string &, stringstream &);
 
 	private:

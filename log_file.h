@@ -18,7 +18,7 @@ class log_file {
 	public:
 		log_file(string &);
 		~log_file();
-		bool read(int, string &, int);
+		bool read(int, string &, struct timespec &);
 		int size();
 		void write(int, string &);
 

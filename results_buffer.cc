@@ -17,26 +17,21 @@ results_buffer::register_(int slot_num, string &seq_num, vector<string> *results
 }
 
 void
-results_buffer::unregister(int slot_num, string &seq_num, unsigned majority, int timeout) {
+results_buffer::unregister(int slot_num, string &seq_num, unsigned majority, struct timespec &timeout) {
 	pthread_mutex_lock(&results_mutex);
 	assert((myresults.find(slot_num) != myresults.end()) && (myresults[slot_num].find(seq_num) != myresults[slot_num].end()));
-	if (timeout == 0) {
-		myresults.erase(slot_num);
-		pthread_mutex_unlock(&results_mutex);
-		return;
-	}
+	//why this?
+	//if (timeout == 0) {
+	//	myresults.erase(slot_num);
+	//	pthread_mutex_unlock(&results_mutex);
+	//	return;
+	//}
 	pthread_cond_t slot_cv;
 	pthread_cond_init(&slot_cv, NULL);
 	context *ct = new context(&slot_cv, majority);
 	mycontexts[slot_num][seq_num] = ct;
-	struct timespec ts;
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
-	ts.tv_sec  = tv.tv_sec;
-	ts.tv_nsec = tv.tv_usec * 1000;
-	ts.tv_sec += timeout;
 	while (myresults[slot_num][seq_num]->size() < majority) {
-		if (pthread_cond_timedwait(&slot_cv, &results_mutex, &ts) == ETIMEDOUT) {
+		if (pthread_cond_timedwait(&slot_cv, &results_mutex, &timeout) == ETIMEDOUT) {
 			break;
 		}
 	}

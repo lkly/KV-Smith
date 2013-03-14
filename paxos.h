@@ -12,6 +12,7 @@
 #include "log_file.h"
 #include "paxos_log.h"
 #include "results_buffer.h"
+#include <sys/time.h>
 
 using namespace std;
 
@@ -27,8 +28,8 @@ class paxos {
 		paxos(server_name &, map<server_name, server_address> &, log_file *);
 		~paxos();
 		void getname(string &);
-		paxos::status prepare(int, string &, string &, int);
-		paxos::status accept(int, string &, string &, int);
+		paxos::status prepare(int, string &, string &, struct timespec &);
+		paxos::status accept(int, string &, string &, struct timespec &);
 		void learn(int, string &);
 		void callback(server_name &, string &);
 

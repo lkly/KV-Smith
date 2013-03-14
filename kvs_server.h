@@ -11,6 +11,7 @@
 #include "replicated_log.h"
 #include <map>
 #include "log_protocol.h"
+#include <sys/time.h>
 
 using namespace std;
 
@@ -24,7 +25,7 @@ class kvs_server {
 		void start();
 
 	private:
-		static int window_size = 1000;
+		static const int window_size = 1000;
 		server_name myname;
 		server_address myaddress;
 		map<server_name, server_address> mymembers;
@@ -40,13 +41,16 @@ class kvs_server {
 		pthread_cond_t ln_cv2;
 		pthread_mutex_t log_mutex;
 		replicated_log *mylog;
+		struct timespec expire_time;
+		int lease_counter;
+		int delta;
 
 		cs_protocol::status get(int, string &);
 		cs_protocol::status put(int, string &);
 		bool prologue();
 		void epilogue(bool);
 		void marshal(string &, cs_protocol::status, string &);
-		replicated_log::status log(string, bool);
+		replicated_log::status log(string, bool, struct timespec &);
 		void log_prologue();
 		void log_epilogue();
 		void recover();
@@ -56,6 +60,7 @@ class kvs_server {
 		void heartbeater();
 		bool doheartbeat();
 		void restart();
+		void renew_lease(int);
 };
 
 
