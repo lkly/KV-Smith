@@ -19,5 +19,6 @@ class tiny_table {
 	private:
 		map<int, string> internal_store;
 		map<int, pthread_mutex_t> locks;
-		pthread_mutex_t locks_mutex;
+		//pthread_mutex_t locks_mutex;
+		int table_size;
 };
