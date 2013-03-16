@@ -35,6 +35,8 @@ class kvs_client {
 		vector<pair<server_name, int> > server_connections;
 		int primary_server;
 		pthread_mutex_t sc_mutex;
+		pthread_t cm;
+		bool exiting;
 
 		void try_to_connect(map<server_name, int> &);
 		bool connecting_done(int &, server_address &);

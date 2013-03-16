@@ -9,19 +9,30 @@ kvs_client::kvs_client(map<server_name, server_address> &servers) {
 		server_connections.push_back(make_pair((*it).first, -1));
 	}
 	primary_server = 0;
-	pthread_t th;
-	if (pthread_create(&th, NULL, kvs_client::connection_maintainer, (void *)this) < 0) {
+	exiting = false;
+	if (pthread_create(&cm, NULL, kvs_client::connection_maintainer, (void *)this) < 0) {
 		kvs_error("@kvs_client: kvs_client connection maintainer creation fails!\n");
 	}
 }
 
 kvs_client::~kvs_client() {
-	kvs_error("@~kvs_client: kvs_client destructor shouldn't be called!\n");
+	//kvs_error("@~kvs_client: kvs_client destructor shouldn't be called!\n");
+	pthread_mutex_lock(&sc_mutex);
+	exiting = true;
+	pthread_mutex_unlock(&sc_mutex);
+	pthread_join(cm, NULL);
+	int i;
+	for (i = 0; i < server_number; i++) {
+		if (server_connections[i].second != -1) {
+			close(server_connections[i].second);
+		}
+	}
 }
 
 void *
 kvs_client::connection_maintainer(void *obj) {
 	((kvs_client *)obj)->connection_maintain();
+	pthread_exit(NULL);
 	return NULL;
 }
 
@@ -31,6 +42,10 @@ kvs_client::connection_maintain() {
 		map<server_name, int> dead_servers;
 		int i;
 		pthread_mutex_lock(&sc_mutex);
+		if (exiting) {
+			pthread_mutex_unlock(&sc_mutex);
+			return;
+		}
 		for (i = 0; i < server_number; i++) {
 			if (server_connections[i].second == -1) {
 				dead_servers[server_connections[i].first] = i;
