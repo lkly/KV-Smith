@@ -5,7 +5,7 @@ PRODUCTS = kvs_server kvs_client gen_log
 LIBS = -lpthread
 CC = g++
 LD = g++
-CFLAGS = -Wall -g
+CFLAGS = -Wall -g -O2
 
 SRCS_SERVER = kvs_server.cc connection_manager.cc tiny_table.cc\
               replicated_log.cc log_file.cc paxos.cc paxos_log.cc results_buffer.cc\

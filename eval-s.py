@@ -8,12 +8,11 @@ import socket
 import datetime
 
 
-port = 10000
 
 #note the trailing blank.
-peers = ['A 127.0.0.1 ',
-		 'B 127.0.0.1 ',
-		 'C 127.0.0.1 ']
+peers = ['A 127.0.0.1 10000',
+		 'B 127.0.0.1 10000',
+		 'C 127.0.0.1 10000']
 
 #0: master, 1: backup
 membership = {'A':1,
@@ -44,15 +43,13 @@ def prepare():
 	cf = open('kvs-s.config', 'w')
 	for peer in peers:
 		cf.write(peer)
-		cf.write(str(port))
 		cf.write('\n')
 	cf.close()
-	port = port + 1
 	log = open(myname+'.log', 'w')
 	log.close()
 
 def start_server():
-	prepare()
+	global child
 	bin = './eval-s'
 	args = (bin, myname, membership[myname]*5)
 	child = spawn(bin, args)
@@ -83,10 +80,12 @@ class commander:
 	
 
 def start():
+	prepare()
 	cmd = commander()
 	while (1):
 		command = cmd.wait_command()
 		if command == "end":
+			kill_server()
 			return
 		elif command == "kill":
 			kill_server()
