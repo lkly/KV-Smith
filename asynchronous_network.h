@@ -29,7 +29,7 @@ class asynchronous_network {
 
 	private:
 
-		static const int worker_num = 10;
+		static const int worker_num = 28;
 
 		map<server_name, server_address> mymembers;
 		paxos *myemployer;

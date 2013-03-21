@@ -9,10 +9,10 @@ import datetime
 
 
 
-#note the trailing blank.
-peers = ['A 127.0.0.1 10000',
-		 'B 127.0.0.1 10000',
-		 'C 127.0.0.1 10000']
+#address for in-group communication and for service
+peers = ['A 127.0.0.1 10000 127.0.0.1 10000',
+		 'B 127.0.0.1 10000 127.0.0.1 10000',
+		 'C 127.0.0.1 10000 127.0.0.1 10000']
 
 #0: master, 1: backup
 membership = {'A':1,
@@ -40,32 +40,49 @@ def spawn(bin, args):
 
 
 def prepare():
-	cf = open('kvs-s.config', 'w')
+	fn = 'kvs-s-' + myname + '.config'
+	cf = open(fn, 'w')
 	for peer in peers:
 		cf.write(peer)
 		cf.write('\n')
 	cf.close()
-	log = open(myname+'.log', 'w')
-	log.close()
 
 def start_server():
+	log = open(myname+'.log', 'w')
+	log.close()
 	global child
 	bin = './eval-s'
 	args = (bin, myname, membership[myname]*5)
 	child = spawn(bin, args)
 
+def checkchild():
+	#try 3 times
+	times = 3
+	while times > 0:
+		time.sleep(3)
+		pid, status = os.waitpid(child, os.WNOHANG)
+		if pid == 0 and status == 0:
+			return 'ok'
+		times = times - 1
+	return 'fail'
+
 def clear():
-	os.remove('kvs-s.config')
 	os.remove(myname+'.log')
 	os.remove(myname+'.out')
 
 def kill_server():
-	status = os.waitpid(child, os.WNOHANG)
-	if status != (0,0):
-		print 'server crashed'
-		return
-	os.kill(child, signal.SIGKILL)
-	clear()
+	global child
+	if child != None:
+		status = os.waitpid(child, os.WNOHANG)
+		if status != (0,0):
+			print 'server crashed'
+			child = None
+			return 'fail'
+		os.kill(child, signal.SIGKILL)
+		child = None
+		clear()
+		return 'ok'
+	return 'ok'
 
 class commander:
 	def __init__(self):
@@ -75,9 +92,19 @@ class commander:
 		self.commander_socket, self.commander_address = self.mysocket.accept()
 	
 	def wait_command(self):
-		command = self.commander_socket.recv(1000)
-		return command
-	
+		command = ''
+		while(1):
+			pcommand = self.commander_socket.recv(1000)
+			command = command + pcommand
+			if command[len(command)-1] == '#':
+				return command[0:len(command)-1]
+
+	def reply(self, result):
+		self.commander_socket.send(result+"#")
+
+	def close(self):
+		self.mysocket.close()
+		self.commander_socket.close()
 
 def start():
 	prepare()
@@ -85,15 +112,21 @@ def start():
 	while (1):
 		command = cmd.wait_command()
 		if command == "end":
-			kill_server()
+			cmd.close()
 			return
 		elif command == "kill":
-			kill_server()
+			result = kill_server()
+			cmd.reply(result)
 		elif command == "start":
 			start_server()
+			result = checkchild()
+			cmd.reply(result)
+		elif command == "ok":
+			cmd.reply('ok')
 		else
 			print 'bad command: ',
 			print command
+
 
 if __name__ == '__main__':
 	if len(sys.argv) == 2:

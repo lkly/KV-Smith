@@ -18,13 +18,16 @@ def prepare_config():
 	cf.close()
 
 def prepare_children(first_child, children_num, first_port):
-	name = 'kvs' + str(first_child) + '.sh'
+	name = 'kvs-' + str(first_child) + '.sh'
 	bash_file = open(name, 'w')
 	for i in range(children_num):
 		bash_file.write('./eval-c.py' + ' ' + str(first_child) + ' ' + str(first_port) + ' &\n')
 		first_child += 1
 		first_port += 1
 	bash_file.close()
+
+def start(first_child)
+	name = 'kvs-' + str(first_child) + '.sh'
 	os.system('chmod +x ' + name)
 	os.system('./' + name)
 
@@ -38,5 +41,7 @@ if __name__ == '__main__':
 		first_port = int(sys.argv[3])
 		prepare_config()
 		prepare_children(first_child, children_num, first_port)
+		start(first_child)
 	else:
 		print 'too many or too few arguments'
+

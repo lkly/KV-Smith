@@ -27,6 +27,13 @@ asynchronous_network::asynchronous_network(map<server_name, server_address> &mem
 	employer->getname(name);
 	assert(name.length() != 0);
 	server_addr.sin_port = htons(atoi(members[name].second.c_str()));
+
+	int yes;
+	yes = 1;
+	if (setsockopt(mysock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
+		kvs_error("@asychronous_network: asychronous_network can't set socket reuseaddr!\n");
+	}
+
 	if (bind(mysock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
 		kvs_error("@asychronous_network: asynchronous_network can't bind mysock!\n");
 	}

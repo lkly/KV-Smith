@@ -32,6 +32,13 @@ connection_manager::start() {
 	//may use emp_addr.first
 	addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	addr.sin_port = htons(atoi(emp_addr.second.c_str()));
+
+	int yes;
+	yes = 1;
+	if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
+		kvs_error("@start: connection_manager can't set socket reuseaddr!\n");
+	}
+
 	if(bind(sockfd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
 		kvs_error("@start: connection_manager can't bind port!\n");
 	}

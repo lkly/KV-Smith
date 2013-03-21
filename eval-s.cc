@@ -3,16 +3,15 @@
 #include <fstream>
 
 
-
-const char *servers[] = {
-	"A 127.0.0.1 20000",
-	"B 127.0.0.1 20001",
-	"C 127.0.0.1 20002",
-};
-
 void
-cons_table(map<server_name, server_address> &table) {
-	fstream fs("kvs-s.config", ios::in);
+cons_table(srting &name, map<server_name, server_address> &table, map<server_name, server_address> &table2) {
+	stringstream fns;
+	fn << "kvs-s-";
+	fn << name;
+	fn << ".config";
+	string fn;
+	fns >> fn;
+	fstream fs(fn.c_str(), ios::in);
 	string line;
 	stringstream ss;
 	while (!fs.eof()) {
@@ -28,6 +27,9 @@ cons_table(map<server_name, server_address> &table) {
 		ss >> ip_addr;
 		ss >> port;
 		table[name] = make_pair(ip_addr, port);
+		ss >> ip_addr;
+		ss >> port;
+		table2[name] = make_pair(ip_addr, port);
 	}
 	fs.close();
 }
@@ -47,8 +49,9 @@ main(int argc, char *argv[]) {
 	int delay;
 	ss >> delay;
 	map<server_name, server_address> table;
-	cons_table(table);
-	kvs_server *server = new kvs_server(name, table[name], table);
+	map<server_name, server_address> table2;
+	cons_table(name, table, table2);
+	kvs_server *server = new kvs_server(name, table2[name], table);
 	//wait connection manager started.
 	//and mastership established.
 	sleep(2+delay);

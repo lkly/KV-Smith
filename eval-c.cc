@@ -13,11 +13,17 @@
 using namespace std;
 
 unsigned int duration;
+unsigned int rw_ratio;
 pthread_mutex_t status_lock;
 int status;
 
 kvs_client *kc;
 int myid;
+
+string thevalue = "@1";
+
+string values[] = {"@2", "@3", "@4", "@5"};
+
 
 //a thread-based timer
 void *
@@ -68,12 +74,14 @@ print_table(map<server_name, server_address> &table) {
 }
 
 kvs_protocol::status
-send_request(int ratio, kvs_protocol::key key, string &rvalue, string &wvalue) {
+send_request(int ratio, kvs_protocol::key key, string &rvalue, string &wvalue, int &rw) {
 	kvs_protocol::status r;
 	if (rand%10 < ratio) {
 		r = kc->put(key, wvalue);
+		rw = 1;
 	} else {
 		r = kc->get(key, rvalue);
+		rw = 0;
 	}
 	return r;
 }
@@ -84,11 +92,9 @@ eval_1() {
 	kvs_protocol::key key;
 	key = myid;
 	string rvalue;
-	stringstream ss;
-	ss << "@w:";
-	ss << myid;
+
 	string wvalue;
-	ss >> wvalue;
+
 
 	//start timer
 	pthread_t mytimer;
@@ -100,20 +106,28 @@ eval_1() {
 	int count;
 	count = 0;
 	mystatus = 0;
+	int index = 0;
 	while (1) {
+		wvalue = values[index];
 		pthread_mutex_lock(&status_lock);
 		mystatus = status;
 		pthread_mutex_unlock(&status_lock);
 		if (mystatus == 0) {
 			int r;
-			r = send_request(3, key, rvalue, wvalue);
+			int rw;
+			r = send_request(rw_ratio, key, rvalue, wvalue, rw);
 			assert(r == kvs_protocol::OK);
+			if (rw == 0) {
+				assert(rvalue == thevalue);
+			} else {
+				thevalue = wvalue;
+			}
 			count++;
 		} else {
 			break;
 		}
+		index = (index++)%4
 	}
-	cout << "eval_1:";
 	cout << " " << count;
 	pthread_join(mytimer, NULL);
 }
@@ -124,25 +138,32 @@ eval_2() {
 	kvs_protocol::key key;
 	key = myid;
 	string rvalue;
-	stringstream ss;
-	ss << "@w:";
-	ss << myid;
+	int index = 0;
 	string wvalue;
-	ss >> wvalue;
 
 	struct timeval start;
 	struct timeval end;
 	while (1) {
+		wvalue = values[index];
 		int r;
-		r = send_request(3, key, rvalue, wvalue);
+		int rw;
+		r = send_request(3, key, rvalue, wvalue, rw);
 		if (r != kvs_protocol::OK) {
 			gettimeofday(&start, NULL);
 			break;
+		} else {
+			if (rw == 0) {
+				assert(rvalue == thevalue);
+			} else {
+				thevalue = wvalue;
+			}
 		}
+		index = (index++)%4;
 	}
 	while (1) {
 		int r;
-		r = send_request(3, key, rvalue, wvalue);
+		int rw;
+		r = send_request(3, key, rvalue, wvalue, rw);
 		if (r == kvs_protocol::OK) {
 			gettimeofday(&end, NULL);
 			break;
@@ -152,9 +173,9 @@ eval_2() {
 	interval = 0;
 	interval += (end.tv_usec - start.tv_usec)/1000;
 	interval += (end.tv_sec - start.tv_sec)*1000;
-	cout << "eval_2: " << interval << endl;
+	cout << " " << interval << endl;
 }
-
+/*
 void
 eval_3(int points) {
 	//prepare
@@ -206,11 +227,15 @@ eval_3(int points) {
 	}
 	pthread_join(mytimer, NULL);
 }
-
+*/
 int
 main(int argc, char *argv[]) {
-	//client_id, eval_number, eval-specific arguments
+	//client_id, eval_number, durtion, rw_ratio
 	//setup
+	if (argc != 5) {
+		cout << "wrong number of arguments for eval" << endl;
+		exit(1);
+	}
 	map<server_name, server_address> table;
 	cons_table(table);
 	kc = new kvs_client(table);
@@ -223,42 +248,29 @@ main(int argc, char *argv[]) {
 	pthread_mutex_init(&status_lock, NULL);
 	status = 0;
 	srand(getpid());
-	duration = 0;
-	ss >> duration;
 
 	//start
 	int eval_number;
 	ss << argv[2];
 	ss >> eval_number;
 
-	switch (eval_num) {
+
+	ss << argv[3];
+	ss >> duration;
+
+
+	ss << argv[4];
+	ss >> rw_ratio;
+
+	switch (eval_number) {
 		case 1:
-			if (argc != 4) {
-				cout << "wrong number of arguments for eval-1" << endl;
-				exit(1);
-			}
-			ss << argv[3];
-			ss >> duration;
 			eval_1();
 			break;
 		case 2:
-			if (argc != 3) {
-				cout << "wrong number of arguments for eval-2" << endl;
-				exit(1);
-			}
 			eval_2();
 			break;
 		case 3:
-			if (argc != 5) {
-				cout << "wrong number of arguments for eval-3" << endl;
-				exit(1);
-			}
-			ss << argv[3];
-			ss >> duration;
-			ss << argv[4];
-			int points;
-			ss >> points;
-			eval_3(points);
+			eval_1();
 			break;
 		default:
 			cout << "unknown eval number: " << eval_number << endl;

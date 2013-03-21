@@ -45,11 +45,15 @@ class commander:
 		self.commander_socket, self.commander_address = self.mysocket.accept()
 	
 	def wait_command(self):
-		command = self.commander_socket.recv(1000)
-		return command
+		command = ''
+		while(1):
+			pcommand = self.commander_socket.recv(1000)
+			command = command + pcommand
+			if command[len(command)-1] == '#':
+				return command[0:len(command)-1]
 
 	def reply(self, result):
-		self.commander_socket.send(result)
+		self.commander_socket.send(result+"#")
 
 	def close(self):
 		self.mysocket.close()
