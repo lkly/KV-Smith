@@ -9,6 +9,14 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <pthread.h>
+#include <fstream>
+#include <stdio.h>
+
+//for eval or just test purpose
+#define EVAL
+
+#define EVAL_PIPE 15
 
 using namespace std;
 
@@ -44,8 +52,8 @@ void
 cons_table(map<server_name, server_address> &table) {
 	fstream fs("kvs-c.config", ios::in);
 	string line;
-	stringstream ss;
 	while (!fs.eof()) {
+		stringstream ss;
 		getline(fs, line);
 		if (line.length() == 0) {
 			continue;
@@ -76,7 +84,7 @@ print_table(map<server_name, server_address> &table) {
 kvs_protocol::status
 send_request(int ratio, kvs_protocol::key key, string &rvalue, string &wvalue, int &rw) {
 	kvs_protocol::status r;
-	if (rand%10 < ratio) {
+	if (rand()%10 < ratio) {
 		r = kc->put(key, wvalue);
 		rw = 1;
 	} else {
@@ -87,20 +95,18 @@ send_request(int ratio, kvs_protocol::key key, string &rvalue, string &wvalue, i
 }
 
 void
-eval_1() {
+eval_performance() {
 	//prepare
 	kvs_protocol::key key;
 	key = myid;
 	string rvalue;
-
 	string wvalue;
-
 
 	//start timer
 	pthread_t mytimer;
 	int times;
 	times = 1;
-	pthread_create((&mytimer, NULL, timer, (void *)&times);
+	pthread_create(&mytimer, NULL, timer, (void *)&times);
 
 	int mystatus;
 	int count;
@@ -116,29 +122,42 @@ eval_1() {
 			int r;
 			int rw;
 			r = send_request(rw_ratio, key, rvalue, wvalue, rw);
+			if (r != kvs_protocol::OK) {
+				cout << r << endl;
+			}
 			assert(r == kvs_protocol::OK);
 			if (rw == 0) {
 				assert(rvalue == thevalue);
 			} else {
 				thevalue = wvalue;
+				index++;
+				index = index%4;
 			}
 			count++;
 		} else {
 			break;
 		}
-		index = (index++)%4
 	}
-	cout << " " << count;
+	cout << '#' << count << '#' << endl;
+#ifdef EVAL
+	char buff[30];
+	int len;
+	len = snprintf(buff, sizeof(buff), "%d", count);
+//	buff[len++] = '#';
+//	buff[len] = 0;
+	assert(write(EVAL_PIPE, buff, len) == len);
+#endif
 	pthread_join(mytimer, NULL);
 }
 
 void
-eval_2() {
+eval_failover() {
 	//prepare
 	kvs_protocol::key key;
 	key = myid;
 	string rvalue;
-	int index = 0;
+	int index;
+	index = 0;
 	string wvalue;
 
 	struct timeval start;
@@ -148,6 +167,7 @@ eval_2() {
 		int r;
 		int rw;
 		r = send_request(3, key, rvalue, wvalue, rw);
+		cout << "send request and get the return value: " << r << endl;
 		if (r != kvs_protocol::OK) {
 			gettimeofday(&start, NULL);
 			break;
@@ -156,78 +176,54 @@ eval_2() {
 				assert(rvalue == thevalue);
 			} else {
 				thevalue = wvalue;
+				index++;
+				index = index%4;
 			}
 		}
-		index = (index++)%4;
 	}
+	cout << "detect master change" << endl;
 	while (1) {
 		int r;
 		int rw;
 		r = send_request(3, key, rvalue, wvalue, rw);
+		cout << "send request and get the return value: " << r << endl;
 		if (r == kvs_protocol::OK) {
 			gettimeofday(&end, NULL);
 			break;
 		}
+		sleep(1);
 	}
 	unsigned int interval;
 	interval = 0;
 	interval += (end.tv_usec - start.tv_usec)/1000;
 	interval += (end.tv_sec - start.tv_sec)*1000;
-	cout << " " << interval << endl;
+	cout << '#' << interval << '#' << endl;
+#ifdef EVAL
+	char buff[30];
+	int len;
+	len = snprintf(buff, sizeof(buff), "%d", interval);
+//	buff[len++] = '#';
+//	buff[len]=0;
+	assert(write(EVAL_PIPE, buff, len) == len);
+#endif
 }
-/*
+
 void
-eval_3(int points) {
-	//prepare
-	kvs_protocol::key key;
+warmup() {
+	int r;
+	int key;
 	key = myid;
 	string rvalue;
-	stringstream ss;
-	ss << "@w:";
-	ss << myid;
-	string wvalue;
-	ss >> wvalue;
-	int progress;
-	progress = 0;
-	map<int, int> counts;
-
-	//start timer
-	pthread_t mytimer;
-	int times;
-	times = points;
-	pthread_create((&mytimer, NULL, timer, (void *)&times);
-
-	while (progress != points) {
-		int mystatus;
-		int count;
-		count = 0;
-		mystatus = 0;
-		while (1) {
-			pthread_mutex_lock(&status_lock);
-			mystatus = status;
-			status = 0;
-			pthread_mutex_unlock(&status_lock);
-			if (mystatus == 0) {
-				int r;
-				r = send_request(progress, key, rvalue, wvalue);
-				assert(r == kvs_protocol::OK);
-				count++;
-			} else {
-				break;
-			}
+	while (1) {
+		r = kc->get(key, rvalue);
+		if (r == kvs_protocol::OK) {
+			assert(rvalue == thevalue);
+			return;
 		}
-		counts[progress] = count;
-		progress++;
+		sleep(1);
 	}
-	progress = 0;
-	cout << "eval_3:";
-	while (progress != points) {
-		cout << " " << counts[progress];
-		progress++;
-	}
-	pthread_join(mytimer, NULL);
 }
-*/
+
 int
 main(int argc, char *argv[]) {
 	//client_id, eval_number, durtion, rw_ratio
@@ -238,45 +234,45 @@ main(int argc, char *argv[]) {
 	}
 	map<server_name, server_address> table;
 	cons_table(table);
+	print_table(table);
 	kc = new kvs_client(table);
 	//wait for connections to be established.
 	sleep(3);
 
-	stringstream ss;
-	ss << argv[1];
-	ss >> myid;
 	pthread_mutex_init(&status_lock, NULL);
 	status = 0;
 	srand(getpid());
 
 	//start
+	myid = atoi(argv[1]);
+
 	int eval_number;
-	ss << argv[2];
-	ss >> eval_number;
+	eval_number = atoi(argv[2]);
 
+	duration = atoi(argv[3]);
 
-	ss << argv[3];
-	ss >> duration;
+	rw_ratio = atoi(argv[4]);
 
-
-	ss << argv[4];
-	ss >> rw_ratio;
+	warmup();
 
 	switch (eval_number) {
 		case 1:
-			eval_1();
+			eval_performance();
 			break;
 		case 2:
-			eval_2();
+			eval_failover();
 			break;
 		case 3:
-			eval_1();
+			eval_performance();
 			break;
 		default:
 			cout << "unknown eval number: " << eval_number << endl;
 			exit(1);
 	}
 	delete kc;
+#ifdef EVAL
+	close(EVAL_PIPE);
+#endif
 	return 0;
 }
 

@@ -47,7 +47,7 @@ class replicated_log {
 		bool failed();
 		void prologue(int &, string &);
 		void epilogue(bool, int &);
-		void movehead(int &);
+		void move_head(int &);
 		void set_failure();
 };
 

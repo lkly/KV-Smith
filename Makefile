@@ -1,6 +1,17 @@
-.PHONY: default clean all depend eval
+.PHONY: default clean all depend eval log
 
-JUNK =  *.o *.core core.*
+log:
+	cp eval-s ~/evalr
+	cp eval-c ~/evalr
+	cp eval-s.py ~/evalr
+	cp eval-c-new.py ~/evalr
+	rm ~/evalr/*.log
+	rm ~/evalr/*.out
+#	touch ~/eval/A.log
+#	touch ~/eval/B.log
+#	touch ~/eval/C.log
+
+JUNK =  *.o *.core core.* *.out
 PRODUCTS = kvs_server kvs_client
 EVAL = eval-s eval-c
 LIBS = -lpthread
@@ -8,13 +19,15 @@ CC = g++
 LD = g++
 CFLAGS = -Wall -g -O2
 
+#s_main.cc
 SRCS_SERVER = kvs_server.cc connection_manager.cc tiny_table.cc\
               replicated_log.cc log_file.cc paxos.cc paxos_log.cc results_buffer.cc\
-              asynchronous_network.cc s_main.cc eval-s.cc
+              asynchronous_network.cc eval-s.cc
 #gen_log.cc
 SRCS_UTILS = utils.cc
 
-SRCS_CLIENT = kvs_client.cc c_main.cc eval-c.cc
+#c_main.cc
+SRCS_CLIENT = kvs_client.cc eval-c.cc
 
 SRCS = $(SRCS_SERVER) $(SRCS_CLIENT) $(SRCS_UTILS)
 
@@ -28,15 +41,13 @@ default:
 	@echo PLZ check README for usage
 
 clean:
-	rm -f $(JUNK) $(PRODUCTS)
+	rm -f $(JUNK) $(PRODUCTS) $(EVAL)
 
 all: $(PRODUCTS)
 
 eval: $(EVAL)
-	chmod +x eval-c.py
+	chmod +x eval-c-new.py
 	chmod +x eval-s.py
-	chmod +x eval.py
-	chmod +x prepare.py
 
 depend:
 	makedepend -Y. $(SRCS)
@@ -50,10 +61,10 @@ kvs_client: $(OBJS_CLIENT) $(OBJS_UTILS)
 kvs_server: $(OBJS_SERVER) $(OBJS_UTILS)
 	$(LD) -o $@ $^ $(LIBS)
 
-eval-c: $(OBJS_CLIENT)
+eval-c: $(OBJS_CLIENT) $(OBJS_UTILS)
 	$(LD) -o $@ $^ $(LIBS)
 
-eval-s: $(OBJS_SERVER)
+eval-s: $(OBJS_SERVER) $(OBJS_UTILS)
 	$(LD) -o $@ $^ $(LIBS)
 
 gen_log: gen_log.o

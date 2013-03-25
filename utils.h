@@ -4,6 +4,9 @@
 #include <assert.h>
 #include <string>
 
+//if not in debug mode, comment out this line
+//#define DEBUG
+
 using namespace std;
 
 void kvs_error(const char *, ...);

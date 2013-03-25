@@ -16,6 +16,7 @@
 #include "common.h"
 #include <map>
 #include <errno.h>
+#include <signal.h>
 
 using namespace std;
 

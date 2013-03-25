@@ -1,4 +1,5 @@
 #include "replicated_log.h"
+#include <iostream>
 
 string replicated_log::special_seq_num = "-1 @";
 char replicated_log::DELIMITER = '\n';
@@ -75,6 +76,7 @@ replicated_log::log(string &record, bool stable, struct timespec &timeout) {
 		default:
 			kvs_error("@log: paxos accept returns an unknown value %d!\n", r);
 	}
+	//std::cout << "learn: " << proposal << std::endl;
 	mypaxos->learn(slot_num, proposal);
 	if (r_l == OK) {
 		epilogue(false, slot_num);
@@ -138,14 +140,14 @@ replicated_log::epilogue(bool failed, int &slot_num) {
 	pthread_mutex_unlock(&next_try_mutex);
 	if (!failed) {
 		pthread_mutex_lock(&rwhead_mutex);
-		movehead(slot_num);
+		move_head(slot_num);
 		pthread_mutex_unlock(&rwhead_mutex);
 	}
 	//else: movedhead will be reset by reset().
 }
 
 void
-replicated_log::movehead(int &slot_num) {
+replicated_log::move_head(int &slot_num) {
 	//hold rwhead lock.
 	//and just now.+++
 	mv_window[slot_num] = 1;
@@ -175,10 +177,10 @@ replicated_log::reset() {
 }
 
 void
-replicated_log::skip(int window_size) {
+replicated_log::skip(int w_size) {
 	//safe: same as reset.
-	rwhead = rwhead + window_size;
-	movehead = rwhead;
+	rwhead = rwhead + w_size;
+	movedhead = rwhead;
 }
 
 

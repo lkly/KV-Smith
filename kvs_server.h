@@ -12,6 +12,7 @@
 #include <map>
 #include "log_protocol.h"
 #include <sys/time.h>
+#include <signal.h>
 
 using namespace std;
 

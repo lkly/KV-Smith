@@ -278,7 +278,11 @@ paxos::do_accept(string &source, stringstream &args) {
 	args >> seq_num_part_2;
 	string seq_num = seq_num_part_1 + " " + seq_num_part_2;
 	string proposed;
-	args >> proposed;
+	//readbuff, leave 2 spaces in buff.
+	char readbuff[100];
+	args.readsome(readbuff, 99);
+	readbuff[args.gcount()] = 0;
+	proposed = readbuff;
 	string proposal;
 	if (persistent_data.size() == 0) {
 		persistent_data[0] = "A";
@@ -327,7 +331,11 @@ paxos::do_learn(string &source, stringstream &args) {
 		return;
 	}
 	string proposed;
-	args >> proposed;
+	//readbuff, leave 2 spaces in buff.
+	char readbuff[100];
+	args.readsome(readbuff, 99);
+	readbuff[args.gcount()] = 0;
+	proposed = readbuff;
 	map<int, string> &persistent_data = acceptor_buffer[slot_num];
 	if (persistent_data.size() == 0) {
 		persistent_data[0] = "L";
@@ -339,7 +347,16 @@ paxos::do_learn(string &source, stringstream &args) {
 		persistent_data[0] = "L";
 		persistent_data[3] = proposed;
 	}
-	check_buffer();
+	//disable underlying window
+	//check_buffer();
+
+	//writing to paxos log
+	//only for test purpose
+	string proposal;
+	logged_proposal(slot_num, "D", "", proposed, proposal);
+	mylog->write(slot_num, proposal);
+
+	wfile->write(slot_num, proposed);
 	pthread_mutex_unlock(&buffer_mutex);
 }
 

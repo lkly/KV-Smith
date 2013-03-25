@@ -64,16 +64,20 @@ results_buffer::fill(int slot_num, string &seq_num, stringstream &args) {
 	} else {
 		//must be prepared.
 		fill_str = temp;
-		args >> temp;
-		assert(!args.eof());
-		fill_str +=  " ";
-		fill_str += temp;
-		args >> temp;
-		assert(!args.eof());
-		fill_str +=  " ";
-		fill_str += temp;
-		args >> temp;
-		assert(args.eof());
+//		args >> temp;
+//		assert(!args.eof());
+//		fill_str +=  " ";
+//		fill_str += temp;
+//		args >> temp;
+//		assert(!args.eof());
+//		fill_str +=  " ";
+//		fill_str += temp;
+//		args >> temp;
+//		assert(args.eof());
+		char readbuff[100];
+		args.readsome(readbuff, 99);
+		readbuff[args.gcount()] = 0;
+		fill_str += readbuff;
 		vp->push_back(fill_str);
 	}
 	if (mycontexts.find(slot_num) == mycontexts.end()) {

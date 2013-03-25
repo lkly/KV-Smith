@@ -1,7 +1,7 @@
 #include "paxos_log.h"
 
 //make all the paxos data holding in memory.
-unsigned paxos_log::max_size = 10000;
+unsigned paxos_log::max_size = 100000;
 int paxos_log::length = 50;//80
 
 paxos_log::paxos_log(string &name) {
@@ -36,10 +36,10 @@ void
 paxos_log::read(int number, string &record) {
 	//use this carefully.
 	kvs_error("@read: paxos_log's read shouldn't be called now!\n");
-	assert(number < (int)max_size);
-	pthread_mutex_lock(&records_mutex);
-	record = records[number];
-	pthread_mutex_unlock(&records_mutex);
+	//assert(number < (int)max_size);
+	//pthread_mutex_lock(&records_mutex);
+	//record = records[number];
+	//pthread_mutex_unlock(&records_mutex);
 }
 
 void

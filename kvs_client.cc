@@ -1,4 +1,5 @@
 #include "kvs_client.h"
+#include <iostream>
 
 kvs_client::kvs_client(map<server_name, server_address> &servers) {
 	this->servers = servers;
@@ -8,6 +9,7 @@ kvs_client::kvs_client(map<server_name, server_address> &servers) {
 	for (it = servers.begin(); it != servers.end(); it++) {
 		server_connections.push_back(make_pair((*it).first, -1));
 	}
+	signal(SIGPIPE, SIG_IGN);
 	primary_server = 0;
 	exiting = false;
 	if (pthread_create(&cm, NULL, kvs_client::connection_maintainer, (void *)this) < 0) {
@@ -53,7 +55,8 @@ kvs_client::connection_maintain() {
 		}
 		pthread_mutex_unlock(&sc_mutex);
 		try_to_connect(dead_servers);
-		sleep(1);
+		//check dead links every 5s
+		sleep(3);
 	}
 }
 
@@ -61,8 +64,10 @@ void
 kvs_client::try_to_connect(map<server_name, int> &dead_servers) {
 	map<server_name, int>::iterator it;
 	for (it = dead_servers.begin(); it != dead_servers.end(); it++) {
+		std::cout << "try to connect to " << it->first << std::endl;
 		int sockfd;
 		if (connecting_done(sockfd, servers[(*it).first])) {
+			std::cout << "connecting to " << it->first << " ok" << std::endl;
 			pthread_mutex_lock(&sc_mutex);
 			assert(server_connections[(*it).second].first == (*it).first);
 			assert(server_connections[(*it).second].second == -1);
@@ -78,7 +83,7 @@ kvs_client::connecting_done(int &sockfd, server_address &address) {
 		kvs_error("@connecting_done: kvs_client open socket fails!\n");
 	}
 	struct timeval timeout;
-	timeout.tv_sec = 2;
+	timeout.tv_sec = 3;
 	timeout.tv_usec = 0;
 	if (setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) < 0) {
 		kvs_error("@connecting_done: kvs_client set socketopt SO_SNDTIMEO fails!\n");
@@ -117,7 +122,8 @@ kvs_client::get(kvs_protocol::key key, string &value) {
 	r = send(connection, message.str().c_str(), ntohl(length), 0);
 	//the os buffer should hold the message at lease once, so send's blocking and successive 
 	//timeout will be signaled by recv's timeout.
-	assert(r == (int)ntohl(length));
+	//enable this assertion only in distributed environment
+	//assert(r == (int)ntohl(length));
 	string r_message;
 	if (get_response(connection, r_message)) {
 		string r_value;
@@ -158,7 +164,8 @@ kvs_client::put(kvs_protocol::key key, string value) {
 	int r = send(connection, &length, 4, 0);
 	assert(r == 4);
 	r = send(connection, message.str().c_str(), ntohl(length), 0);
-	assert(r == (int)ntohl(length));
+	//same as the reason for get
+	//assert(r == (int)ntohl(length));
 	string r_message;
 	if (get_response(connection, r_message)) {
 		string r_value;
@@ -192,7 +199,7 @@ kvs_client::get_response(int connection, string &message) {
 		r = recv(connection, buffer+next, 500-next, 0);
 		//server nerver close connection first.
 		//assert(r != 0);
-		if (r < 0) {
+		if (r <= 0) {
 			return false;
 		}
 		next += r;
@@ -200,7 +207,7 @@ kvs_client::get_response(int connection, string &message) {
 			break;
 		}
 	}
-	length = ntohl(*((int *)buffer));
+	length = ntohl(*((int *)((void *)buffer)));
 	buffer[next] = 0;
 	result << (buffer+4);
 	while (1) {
@@ -209,7 +216,7 @@ kvs_client::get_response(int connection, string &message) {
 		}
 		r = recv(connection, buffer, 500, 0);
 		//assert(r != 0);
-		if (r < 0) {
+		if (r <= 0) {
 			return false;
 		}
 		next += r;

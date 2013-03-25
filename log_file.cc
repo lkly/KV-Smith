@@ -87,7 +87,8 @@ log_file::write(int number, string &record) {
 	//a simple infinite-memory write-through cache.
 	pthread_mutex_lock(&cache_mutex);
 	//make sure the caller has enforced sequential writing.
-	assert(w_next == number);
+	//unnecessary for read-only and w_next checked only once.
+	//assert(w_next == number);
 	w_next++;
 	cache[number] = record;
 	pthread_cond_signal(&cache_cv);

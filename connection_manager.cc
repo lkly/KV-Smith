@@ -94,7 +94,7 @@ connection_manager::get_request(int fd, string &request) {
 			break;
 		}
 	}
-	length = ntohl(*((int *)buffer));
+	length = ntohl(*((int *)((void *)buffer)));
 	buffer[next] = 0;
 	result << buffer+4;
 	while (1) {

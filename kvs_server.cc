@@ -1,7 +1,9 @@
 #include "kvs_server.h"
 #include "connection_manager.h"
+#include <iostream>
 
 kvs_server::kvs_server(server_name &name, server_address &address, map<server_name, server_address> &members) {
+	signal(SIGPIPE, SIG_IGN);
 	myname = name;
 	myaddress = address;
 	mymembers = members;
@@ -50,6 +52,7 @@ kvs_server::get_address(server_address &addr) {
 
 void
 kvs_server::callback(string &request, string &r_message) {
+	//std::cout << "catch request." << std::endl;
 	stringstream buffer;
 	buffer << request;
 	cs_protocol::op_t operation;
@@ -86,6 +89,7 @@ kvs_server::get(int key, string &value) {
 cs_protocol::status
 kvs_server::put(int key, string &value) {
 	cs_protocol::status r_status;
+	r_status = 0;
 	if (!prologue()) {
 		return cs_protocol::NOT_PRIMARY;
 	}
@@ -166,18 +170,19 @@ kvs_server::log(string record, bool stable, struct timespec &to) {
 	//here is where parallelism in.
 	//and now just a plain parallelism-free scheme.
 	replicated_log::status r;
+	std::cout << "log: " << record << std::endl;
 	r = mylog->log(record, stable, to);
 	return r;
 }
 
 void
-renew_lease(int c) {
+kvs_server::renew_lease(int c) {
 	//check am_i_primary?
 	//a simple scheme:
-	//renew lease every 5 successful requests, or a 200ms lease period.
+	//renew lease every 10 successful requests, or a 100ms lease period.
 	lease_counter += c;
-	expire_time.tv_sec += lease_counter/5;
-	lease_counter = lease_counter % 5;
+	expire_time.tv_sec += lease_counter/10;
+	lease_counter = lease_counter % 10;
 }
 
 void
@@ -207,7 +212,9 @@ void
 kvs_server::start() {
 	while (1) {
 		recover();
+		std::cout << "I'm master." << std::endl;
 		serve();
+		std::cout << "I'm slave." << std::endl;
 	}
 }
 
@@ -233,6 +240,7 @@ kvs_server::recover() {
 				continue;
 			}
 		}
+		std::cout << "redo: " << record << std::endl;
 		redo(record, deltato);
 	}
 }
@@ -288,18 +296,18 @@ kvs_server::redo(string &record, int &deltato) {
 	stringstream buffer;
 	buffer << record;
 	buffer >> rt;
+	string value;
 	switch (rt) {
 		case log_protocol::UPDATE:
 			//single-threaded recover.
 			renew_lease(1);
 			int key;
 			buffer >> key;
-			string value;
 			buffer >> value;
 			local_db.update(key, value);
 			break;
 		case log_protocol::HEARTBEAT:
-			renew_lease(6);
+			renew_lease(12);
 			break;
 		case log_protocol::BEMASTER:
 			//try to eliminate interference to the new master.
@@ -342,11 +350,11 @@ kvs_server::doheartbeat() {
 	pthread_mutex_lock(&log_mutex);
 	ts = expire_time;
 	pthread_mutex_unlock(&log_mutex);
-	replicated_log::status r = log(record.str(), true);
+	replicated_log::status r = log(record.str(), true, ts);
 	switch (r) {
 		case replicated_log::OK:
 			pthread_mutex_lock(&log_mutex);
-			renew_lease(6);//account for scheduling's overhead.
+			renew_lease(12);//account for scheduling's overhead.
 			pthread_mutex_unlock(&log_mutex);
 			success = true;
 			break;
