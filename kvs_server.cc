@@ -2,6 +2,13 @@
 #include "connection_manager.h"
 #include <iostream>
 
+#ifdef EVAL
+#include <fstream>
+
+fstream rfs("recovery.txt", ios::out);
+
+#endif
+
 kvs_server::kvs_server(server_name &name, server_address &address, map<server_name, server_address> &members) {
 	signal(SIGPIPE, SIG_IGN);
 	myname = name;
@@ -69,7 +76,14 @@ kvs_server::callback(string &request, string &r_message) {
 		r = put(key, value);
 		value.clear();
 		marshal(r_message, r, value);
-	} else {
+	} /*else if (operation == cs_protocol::TESTANDSET) {
+		string value1;
+		string value2;
+		buffer >> value1;
+		buffer >> value2;
+		r = testandset(key, value1, value2, value);
+		marshal(r_message, r, value);
+	} */else {
 		kvs_error("@callback: kvs_server receives an unknown operation %d!\n", operation);
 	}
 }
@@ -127,6 +141,59 @@ kvs_server::put(int key, string &value) {
 	epilogue(r != replicated_log::OK);
 	return r_status;
 }
+
+/*
+cs_protocol::status
+kvs_server::testandset(int key, string &value1, string &value2, string &value) {
+	cs_protocol::status r_status;
+	r_status = 0;
+	if (!prologue()) {
+		return cs_protocol::NOT_PRIMARY;
+	}
+	local_db.lock(key);
+	stringstream record;
+	record << log_protocol::Con_UPDATE;
+	record << ' ';
+	record << key;
+	record << ' ';
+	record << value1;
+	record << ' ';
+	record << value2;
+	log_prologue();
+	//should in log_prologue
+	struct timespec ts;
+	pthread_mutex_lock(&log_mutex);
+	ts = expire_time;
+	pthread_mutex_unlock(&log_mutex);
+	replicated_log::status r = log(record.str(), true, ts);
+	if (r == replicated_log::OK) {
+		pthread_mutex_lock(&log_mutex);
+		renew_lease(1);
+		pthread_mutex_unlock(&log_mutex);
+	}
+	log_epilogue();
+	if (r == replicated_log::FAIL) {
+		r_status = cs_protocol::RETRY;
+	} else if (r == replicated_log::TIMEOUT) {
+		r_status = cs_protocol::TIMEOUT;
+	} else if (r == replicated_log::OK) {
+		r_status = cs_protocol::OK;
+		string v;
+		local_db.select(key, v);
+		if (v == value1) {
+			local_db.update(key, value2);
+			value = "1";
+		} else {
+			value = "0";
+		}
+	} else {
+		kvs_error("@testandset: kvs_server log returns an unknown status %d!\n", r);
+	}
+	local_db.unlock(key);
+	epilogue(r != replicated_log::OK);
+	return r_status;
+}
+*/
 
 bool
 kvs_server::prologue() {
@@ -213,6 +280,11 @@ kvs_server::start() {
 	while (1) {
 		recover();
 		std::cout << "I'm master." << std::endl;
+#ifdef EVAL
+		struct timeval tv;
+		gettimeofday(&tv, NULL);
+		rfs << tv.tv_sec << std::endl;
+#endif
 		serve();
 		std::cout << "I'm slave." << std::endl;
 	}
@@ -317,7 +389,19 @@ kvs_server::redo(string &record, int &deltato) {
 			deltato = 3;
 			mylog->skip(window_size);
 			break;
-		default:
+/*		case log_protocol::Con_UPDATE:
+			renew_lease(1);
+			int key;
+			string value1, value2;
+			buffer >> key;
+			buffer >> value1;
+			buffer >> value2;
+			local_db.select(key, value);
+			if (value == value1) {
+				local_db.update(key, value2);
+			}
+			break;
+*/		default:
 			kvs_error("@redo: kvs_server reads an unknown record type %d from log!\n", rt);
 	}
 }

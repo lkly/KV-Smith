@@ -83,7 +83,7 @@ kvs_client::connecting_done(int &sockfd, server_address &address) {
 		kvs_error("@connecting_done: kvs_client open socket fails!\n");
 	}
 	struct timeval timeout;
-	timeout.tv_sec = 3;
+	timeout.tv_sec = 5;
 	timeout.tv_usec = 0;
 	if (setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) < 0) {
 		kvs_error("@connecting_done: kvs_client set socketopt SO_SNDTIMEO fails!\n");
@@ -187,6 +187,57 @@ kvs_client::put(kvs_protocol::key key, string value) {
 	//just for suppressing compiler's warnings.
 	return 0;
 }
+
+/*
+kvs_protocol::status
+kvs_client::testandset(kvs_protocol::key key, string value1, string value2) {
+	int connection = next_connection();
+	if (connection == -1) {
+		return kvs_protocol::RETRY;
+	}
+	stringstream message;
+	message << cs_protocol::TESTANDSET;
+	message << ' ';
+	message << key;
+	message << ' ';
+	message << value1;
+	message << ' ';
+	message << value2;
+	int length = message.str().length();
+	length = htonl(length);
+	int r = send(connection, &length, 4, 0);
+	assert(r == 4);
+	r = send(connection, message.str().c_str(), ntohl(length), 0);
+	//same as the reason for get
+	//assert(r == (int)ntohl(length));
+	string r_message;
+	if (get_response(connection, r_message)) {
+		string r_value;
+		switch (get_r_value(r_message, r_value)) {
+			case cs_protocol::NOT_PRIMARY:
+			case cs_protocol::RETRY:
+				primary_server = next_server(primary_server);
+				return kvs_protocol::RETRY;
+			case cs_protocol::TIMEOUT:
+				primary_server = next_server(primary_server);
+				return kvs_protocol::TIMEOUT;
+			case cs_protocol::OK:
+				int result;
+				result = atoi(r_value.c_str());
+				if (result == 1) {
+					return kvs_protocol::OK;
+				} else {
+					return kvs_protocol::TAS_FAIL;
+				}
+		}
+	} else {
+		update_connection(connection);
+		return kvs_protocol::TIMEOUT;
+	}
+	//just for suppressing compiler's warnings.
+	return 0;
+}
+*/
 
 bool
 kvs_client::get_response(int connection, string &message) {

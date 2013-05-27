@@ -10,9 +10,14 @@ import datetime
 
 
 #address for in-group communication and for service
-peers = ['A 127.0.0.1 10000 127.0.0.1 10001',
+peers_local = ['A 127.0.0.1 10000 127.0.0.1 10001',
 		 'B 127.0.0.1 11000 127.0.0.1 11001',
 		 'C 127.0.0.1 12000 127.0.0.1 12001']
+
+peers = ['A 192.168.1.101 10000 192.168.1.101 10001',
+		 'B 192.168.1.102 10000 192.168.1.102 10001',
+		 'C 192.168.1.103 10000 192.168.1.103 10001']
+
 
 #0: master, 1: backup
 membership = {'A':1,
@@ -27,9 +32,11 @@ child = None
 
 startcount = 0
 
+killtime = ''
+
 def gettime():
 	now = datetime.datetime.now()
-	return "%d:%d:%d " % (now.hour, now.minute, now.second)
+	return "%d %d %d " % (now.hour, now.minute, now.second)
 
 def spawn(bin, args):
 	output = open(myname + '-' + str(startcount) +'.out', 'w')
@@ -87,6 +94,7 @@ def clear():
 
 def kill_server():
 	global child
+	global killtime
 	if child != None:
 		status = os.waitpid(child, os.WNOHANG)
 		if status != (0,0):
@@ -96,6 +104,7 @@ def kill_server():
 		#always succeed
 		os.kill(child, signal.SIGKILL)
 		os.waitpid(child, 0)
+		killtime = time.time()
 		child = None
 		clear()
 		return 'ok'
@@ -145,10 +154,26 @@ def start():
 		elif command == "ok":
 			print 'ok'
 			cmd.reply('ok')
+		elif command == "getkt":
+			print 'getkilltime: ',
+			print getkilltime()
+			cmd.reply(getkilltime())
+		elif command == "getrt":
+			print 'getrecoverytime: ',
+			print getrecoverytime()
+			cmd.reply(getrecoverytime())
 		else:
 			print 'unknown command: ',
 			print command
 
+def getkilltime():
+	return str(int(killtime))
+
+def getrecoverytime():
+	rf = open("recovery.txt", 'r')
+	recoverytime = rf.readline(100)
+	rf.close()
+	return recoverytime[0:(len(recoverytime)-1)]
 
 if __name__ == '__main__':
 	#server name: A, B, C

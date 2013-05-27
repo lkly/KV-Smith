@@ -14,7 +14,11 @@
 #include <sys/time.h>
 #include <signal.h>
 
+#define EVAL
+
 using namespace std;
+
+
 
 
 class kvs_server {
@@ -48,6 +52,7 @@ class kvs_server {
 
 		cs_protocol::status get(int, string &);
 		cs_protocol::status put(int, string &);
+/*		cs_protocol::status testandset(int, string &, string &, string &);*/
 		bool prologue();
 		void epilogue(bool);
 		void marshal(string &, cs_protocol::status, string &);

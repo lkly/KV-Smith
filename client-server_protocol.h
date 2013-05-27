@@ -2,7 +2,7 @@ class cs_protocol {
 	public:
 		typedef int op_t;
 		enum opcode {
-			GET = 0x01, PUT
+			GET = 0x01, PUT, TESTANDSET,
 		};
 		typedef int status;
 		enum xxstatus {

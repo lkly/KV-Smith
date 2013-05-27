@@ -8,13 +8,21 @@ import socket
 import datetime
 
 #first is the designated master
-servers = ['B 127.0.0.1 11001',
+servers_local = ['B 127.0.0.1 11001',
 		   'A 127.0.0.1 10001',
 		   'C 127.0.0.1 12001']
 
-evalservers = ['A 127.0.0.1 9000',
+servers = ['B 192.168.1.102 10001',
+		   'A 192.168.1.101 10001',
+		   'C 192.168.1.103 10001']
+
+evalservers_local = ['A 127.0.0.1 9000',
 			   'B 127.0.0.1 9100',
 			   'C 127.0.0.1 9200']
+
+evalservers = ['A 192.168.1.101 9000',
+			   'B 192.168.1.102 9000',
+			   'C 192.168.1.103 9000']
 
 def evalprepare():
 	global resultfile
@@ -213,6 +221,13 @@ def eval_(evalid, cn, duration, rw_ratio):
 			os.close(childrenpipe[i])
 #			os.remove('eval-' + str(i) +'.out')
 
+	if (not failed) and (evalid == 2):
+		snodes[1].work('getkt')
+		killtime = snodes[1].done()
+		#anyone is ok
+		snodes[0].work('getrt')
+		recoverytime = snodes[0].done()
+		failovertime = int(recoverytime)-int(killtime)
 
 	print hint,
 	if failed:
@@ -223,7 +238,12 @@ def eval_(evalid, cn, duration, rw_ratio):
 		print result
 		finalr = compute(evalid, result, duration)
 		print finalr
-		logresult(hint, result, finalr)
+		opt = ''
+		if evalid == 2:
+			opt = 'failover time(server-side): '
+			opt = opt + str(failovertime*1000) + 'ms'
+			print opt
+		logresult(hint, result, finalr, opt)
 		return True
 
 def compute(eid, result, duration):
@@ -244,7 +264,7 @@ def compute(eid, result, duration):
 		for i in result:
 			n += int(i)
 		n = n/len(result)
-		finalr = 'average failover time: ' + str(n) + 'ms'
+		finalr = 'average failover time(client-side): ' + str(n) + 'ms'
 		return finalr
 	else:
 		print 'unknown evalid'
@@ -252,13 +272,16 @@ def compute(eid, result, duration):
 
 resultfile = None
 
-def logresult(hint, result, finalr):
+def logresult(hint, result, finalr, opt):
 	resultfile.write(hint)
 	resultfile.write('\n')
 	resultfile.write(str(result))
 	resultfile.write('\n')
 	resultfile.write(finalr)
 	resultfile.write('\n')
+	if opt != '':
+		resultfile.write(opt)
+		resultfile.write('\n')
 
 def end():
 	for i in snodes:
@@ -305,7 +328,7 @@ def evaluate():
 	step = 10
 	redo = False
 	nc = 5
-	while nc <= 35:
+	while nc <= 15:
 		if prepare() == 'fail':
 			clear()
 			if redo:
@@ -314,7 +337,7 @@ def evaluate():
 				print "eval-1 stopped at " + str(nc) + ' nodes'
 				#return or break?
 				return
-		result = eval_(1, nc, 40, 3)
+		result = eval_(1, nc, 10, 3)
 		clear()
 		if not result:
 			if redo:
@@ -332,7 +355,7 @@ def evaluate():
 	step = 10
 	redo = False
 	nc = 5
-	while nc <= 35:
+	while nc <= 15:
 		if prepare() == 'fail':
 			clear()
 			if redo:
@@ -341,7 +364,7 @@ def evaluate():
 				print "eval-2 stopped at " + str(nc) + ' nodes'
 				#return or break?
 				return
-		result = eval_(2, nc, 40, 3)
+		result = eval_(2, nc, 10, 3)
 		clear()
 		if not result:
 			if redo:
@@ -356,7 +379,7 @@ def evaluate():
 
 	#eval-3: 0% 20% 40% 60% 80% 100%
 	print "eval-3 start"
-	step = 2
+	step = 5
 	redo = False
 	ratio = 0
 	while ratio <= 10:
@@ -368,7 +391,7 @@ def evaluate():
 				print "eval-3 stopped at " + str(nc) + ' nodes'
 				#return or break?
 				return
-		result = eval_(3, 20, 40, ratio)
+		result = eval_(3, 10, 10, ratio)
 		clear()
 		if not result:
 			if redo:
@@ -380,7 +403,6 @@ def evaluate():
 			ratio += step
 	print "eval-3 end"
 
-	end()
 
 if __name__ == '__main__':
 #i: interactive-mode
@@ -391,6 +413,7 @@ if __name__ == '__main__':
 			start(True)
 		else:
 			start(False)
+			end()
 	else:
 		print 'too many or too few arguments'
 

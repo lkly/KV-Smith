@@ -3,7 +3,7 @@ class kvs_protocol {
 		typedef int status;
 		typedef int key;
 		enum xxstatus {
-			OK = 0x1, RETRY, TIMEOUT
+			OK = 0x1, RETRY, TIMEOUT, TAS_FAIL
 		};
 };
 

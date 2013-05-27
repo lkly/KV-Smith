@@ -27,6 +27,8 @@ class kvs_client {
 		~kvs_client();
 		kvs_protocol::status get(kvs_protocol::key, string &);
 		kvs_protocol::status put(kvs_protocol::key, string);
+
+/*		kvs_protocol::status testandset(kvs_protocol::key, string, string);*/
 		void connection_maintain();
 		static void *connection_maintainer(void *);
 

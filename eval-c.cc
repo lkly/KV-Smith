@@ -17,6 +17,7 @@
 #define EVAL
 
 #define EVAL_PIPE 15
+#define EVAL_PIPE_2 14
 
 using namespace std;
 
@@ -218,10 +219,16 @@ warmup() {
 		r = kc->get(key, rvalue);
 		if (r == kvs_protocol::OK) {
 			assert(rvalue == thevalue);
-			return;
+			break;
 		}
 		sleep(1);
 	}
+#ifdef EVAL
+//	char buff[2];
+//	assert(read(EVAL_PIPE_2, buff, 2) == 1);
+//	close(EVAL_PIPE_2);
+	sleep(3);
+#endif
 }
 
 int
